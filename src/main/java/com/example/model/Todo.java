@@ -1,5 +1,7 @@
 package com.example.model;
 
+import java.util.Objects;
+
 public class Todo {
 
     private Long id;
@@ -7,11 +9,19 @@ public class Todo {
     private boolean complete;
     private Priority priority;
 
+    public Todo() {
+        this.priority = Priority.LOW;
+    }
+
     public Todo(Long id, String title, boolean complete) {
         this.id = id;
         this.title = title;
         this.complete = complete;
         this.priority = Priority.LOW;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Long getId() {
@@ -51,39 +61,15 @@ public class Todo {
     }
 
     @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((id == null) ? 0 : id.hashCode());
-        result = prime * result + ((title == null) ? 0 : title.hashCode());
-        result = prime * result + (complete ? 1231 : 1237);
-        result = prime * result + ((priority == null) ? 0 : priority.hashCode());
-        return result;
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        Todo todo = (Todo) obj;
+        return Objects.equals(id, todo.id);
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        Todo other = (Todo) obj;
-        if (id == null) {
-            if (other.id != null)
-                return false;
-        } else if (!id.equals(other.id))
-            return false;
-        if (title == null) {
-            if (other.title != null)
-                return false;
-        } else if (!title.equals(other.title))
-            return false;
-        if (complete != other.complete)
-            return false;
-        if (priority != other.priority)
-            return false;
-        return true;
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }

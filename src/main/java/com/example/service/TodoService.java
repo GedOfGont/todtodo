@@ -1,6 +1,7 @@
 package com.example.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.stereotype.Component;
@@ -25,4 +26,6 @@ public interface TodoService {
     void getStatistics();
     Todo setPriority(Long id, Priority priority);
     List<Todo> findByPriority(Priority priority);
+    Map<Long, Todo> loadTodos();
+    void onDataChanged();
 }

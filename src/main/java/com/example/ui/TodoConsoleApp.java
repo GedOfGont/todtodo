@@ -4,19 +4,28 @@ import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 
 import com.example.model.Priority;
 import com.example.model.Todo;
 import com.example.service.TodoService;
 
 public class TodoConsoleApp {
+    private final Logger logger = LoggerFactory.getLogger(TodoConsoleApp.class);
     private final TodoService todoService;
+    private final Environment environment;
 
-    public TodoConsoleApp(TodoService todoService) {
+    public TodoConsoleApp(TodoService todoService, Environment environment) {
         this.todoService = todoService;
+        this.environment = environment;
     }
 
     public void start() {
+        clearConsole();
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 displayMenu();
@@ -26,13 +35,23 @@ public class TodoConsoleApp {
                     if (!handleMenuChoice(scanner, choice)) {
                         return;
                     }
+                    if (needsPause(choice)) {
+                        System.out.println("Press Enter to continue...");
+                        scanner.nextLine();
+                    }
+                    clearConsole();
                 } catch (InputMismatchException e) {
-                    System.out.println("Please enter a valid menu number (1-13)");
+                    String range = (isFileProfile()) ? "1-14" : "1-13";
+                    System.out.println("Please enter a valid menu number " + range);
                     scanner.nextLine();
+                    System.out.println("Press Enter to continue...");
+                    scanner.nextLine();
+                    clearConsole();
                     continue;
                 }
             }
         } catch (Exception e) {
+            logger.error("Fatal error: ", e);
             e.printStackTrace();
         }
     }
@@ -52,7 +71,12 @@ public class TodoConsoleApp {
         System.out.println("10) Statistics");
         System.out.println("11) Set Todo Priority");
         System.out.println("12) Todos By Priority");
-        System.out.println("13) Exit");
+        if (isFileProfile()) {
+            System.out.println("13) Import Todos");
+            System.out.println("14) Exit");
+        } else {
+            System.out.println("13) Exit");
+        }
         System.out.print("Your choice: ");
     }
 
@@ -101,7 +125,7 @@ public class TodoConsoleApp {
                     System.out.println("Todo removed successfully");
                     break;
                 }
-                System.out.println("Todo did not remove");
+                System.out.println("Failed to remove todo");
                 break;
 
             case 5:
@@ -121,6 +145,7 @@ public class TodoConsoleApp {
                 List<Todo> pendingTodos = todoService.pendingTodos();
                 if (pendingTodos.isEmpty()) {
                     System.out.println("No pending todos! All completed.");
+                    logger.warn("Attempted to get no pending todo list");
                     break;
                 }
                 System.out.println("Pending Todos: ");
@@ -129,6 +154,7 @@ public class TodoConsoleApp {
             case 7:
                 if (isEmpty()) {
                     System.out.println("No todos to mark as complete");
+                    logger.warn("Attempted to mark empty todo list");
                     break;
                 }
                 todoService.markAllCompleted();
@@ -137,6 +163,7 @@ public class TodoConsoleApp {
             case 8:
                 if (isEmpty()) {
                     System.out.println("Todo list is already empty");
+                    logger.warn("Attempted to clear empty todo list");
                     break;
                 }
                 todoService.clear();
@@ -148,11 +175,13 @@ public class TodoConsoleApp {
 
                 if (searchTodoTitle.trim().isEmpty()) {
                     System.out.println("Search keyword cannot be empty");
+                    logger.warn("Attempted to search with empty keyword");
                     break;
                 }
                 List<Todo> foundTodos = todoService.searchByTitle(searchTodoTitle);
                 if (foundTodos.isEmpty()) {
                     System.out.println("No todos found containing: '" + searchTodoTitle + "'");
+                    logger.warn("Attempted to find with not found title: {} ", searchTodoTitle);
                     break;
                 }
                 System.out.println("Found " + foundTodos.size() + " todos");
@@ -174,6 +203,7 @@ public class TodoConsoleApp {
 
                 if (!validatePriority(priorityString)) {
                     System.out.println("Invalid Priority '" + priorityString + "'! Please use: LOW, MEDIUM, HIGH");
+                    logger.error("Attempted to set priority with invalid value: {}", priorityString);
                     break;
                 }
 
@@ -182,28 +212,48 @@ public class TodoConsoleApp {
                     System.out.println("Priority is already: " + newPriority);
                     break;
                 }
-                
+
                 todoService.setPriority(priorityTodo.getId(), Priority.valueOf(priorityString));
                 System.out.println("Priority updated from " + priorityTodo.getPriority() + " to " + priorityString);
                 break;
             case 12:
-                System.out.println("Enter the priority: ");
+                System.out.println("Enter the priority (LOW/MEDIUM/HIGH): ");
                 String priority = scanner.nextLine().toUpperCase();
-                if(priority.trim().isEmpty()) {
+                if (priority.trim().isEmpty()) {
                     System.out.println("Priority cannot be empty");
                     break;
                 }
+
+                if (!validatePriority(priority)) {
+                    System.out.println("Invalid priority! Please use: LOW, MEDIUM, HIGH");
+                    break;
+                }
+
                 List<Todo> listByPriority = todoService.findByPriority(Priority.valueOf(priority));
-                if(listByPriority.isEmpty()) {
-                    System.out.println("There is no todo with priorty: "+priority);
+                if (listByPriority.isEmpty()) {
+                    System.out.println("There is no todo with priority: " + priority);
                     break;
                 }
 
                 listByPriority.forEach(todo -> System.out.println(todo.toString()));
                 break;
             case 13:
-                System.out.println("Todtodo is closing...");
-                return false;
+                if (isFileProfile()) {
+                    todoService.loadTodos();
+                } else {
+                    System.out.println("Todtodo is closing...");
+                    return false;
+                }
+                break;
+
+            case 14:
+                if (isFileProfile()) {
+                    System.out.println("Todtodo is closing...");
+                    return false;
+                } else {
+                    System.out.println("Invalid choice!");
+                }
+                break;
             default:
                 System.out.println("Invalid choice!");
                 break;
@@ -227,6 +277,7 @@ public class TodoConsoleApp {
             Priority.valueOf(priority);
             return true;
         } catch (IllegalArgumentException e) {
+            logger.error("priority has illegal value", e);
             return false;
         }
     }
@@ -263,5 +314,26 @@ public class TodoConsoleApp {
         }
     }
 
+    private void clearConsole() {
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
+            } else {
+                System.out.print("\033[2J\033[H");
+                System.out.flush();
+            }
+        } catch (Exception e) {
+            logger.error("Console cannot clear: ", e);
+            e.printStackTrace();
+        }
+    }
+
+    private boolean needsPause(int menuNumber) {
+        return Set.of(2, 6, 9, 10, 12).contains(menuNumber);
+    }
+
+    private boolean isFileProfile() {
+        return environment.getActiveProfiles().length > 0 && environment.getActiveProfiles()[0].equals("file");
+    }
 
 }
