@@ -1,0 +1,9 @@
+
+
+
+GET http://localhost:8080/api/todos/findAll HTTP/1.1
+Accept: application/json
+
+
+GET http://localhost:8080/api/todos/refresh HTTP/1.1
+Accept: application/json

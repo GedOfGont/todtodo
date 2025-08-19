@@ -1,4 +1,4 @@
-package com.example.ui;
+package com.example.console.ui;
 
 import java.util.InputMismatchException;
 import java.util.List;
@@ -12,6 +12,7 @@ import org.springframework.core.env.Environment;
 
 import com.example.model.Priority;
 import com.example.model.Todo;
+import com.example.model.TodoStatistics;
 import com.example.service.TodoService;
 
 public class TodoConsoleApp {
@@ -133,7 +134,7 @@ public class TodoConsoleApp {
                 if (toggleTodo == null) {
                     break;
                 }
-                Todo updatedTodo = todoService.toggleComplete(toggleTodo.getId());
+                Todo updatedTodo = todoService.toggleComplete(toggleTodo.getId()).get();
                 if (updatedTodo != null) {
                     System.out
                             .println("Todo status toggled to: " + (updatedTodo.isComplete() ? "Completed" : "Pending"));
@@ -188,7 +189,22 @@ public class TodoConsoleApp {
                 foundTodos.forEach(System.out::println);
                 break;
             case 10:
-                todoService.getStatistics();
+                TodoStatistics todoStatistics = todoService.getStatistics();
+                if (todoStatistics == null) {
+                    break;
+                }
+                System.out.println(" ===== TODO STATISTICS =====");
+                System.out.println("Total todos : " + todoStatistics.getTotalTodos());
+                System.out.println("Pending todos : " + todoStatistics.getPendingTodos());
+                System.out.println("Completed todos : " + todoStatistics.getCompletedTodos());
+                System.out.println("Completion rate : "
+                        + Math.round(
+                                (todoStatistics.getCompletedTodos() / (double) todoStatistics.getTotalTodos()) * 100)
+                        + "%");
+                System.out.println("High priority : " + todoStatistics.getHighPriorityTodos());
+                System.out.println("Medium priority : " + todoStatistics.getMediumPriorityTodos());
+                System.out.println("Low priority : " + todoStatistics.getLowPriorityTodos());
+
                 break;
             case 11:
                 Todo priorityTodo = getValidTodo(scanner, "set priority");
@@ -239,7 +255,7 @@ public class TodoConsoleApp {
                 break;
             case 13:
                 if (isFileProfile()) {
-                    todoService.loadTodos();
+                    System.out.println("Data loaded from file:");
                 } else {
                     System.out.println("Todtodo is closing...");
                     return false;

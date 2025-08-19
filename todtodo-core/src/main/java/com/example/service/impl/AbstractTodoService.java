@@ -6,9 +6,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import com.example.model.Priority;
 import com.example.model.Todo;
+import com.example.model.TodoStatistics;
 import com.example.service.TodoService;
 
 public abstract class AbstractTodoService implements TodoService {
@@ -22,13 +24,13 @@ public abstract class AbstractTodoService implements TodoService {
     }
 
     @Override
-    public Todo save(String title) {
+    public Optional<Todo> save(String title) {
         validateTitle(title);
         Long newTodoId = idCounter.getAndIncrement();
         Todo newTodo = new Todo(newTodoId, title, false);
         todos.put(newTodoId, newTodo);
         onDataChanged();
-        return newTodo;
+        return Optional.of(newTodo);
 
     }
 
@@ -39,16 +41,16 @@ public abstract class AbstractTodoService implements TodoService {
     }
 
     @Override
-    public Todo update(Long id, String title) {
+    public Optional<Todo> update(Long id, String title) {
         validateId(id);
         validateTitle(title);
         Optional<Todo> updateTodo = findById(id);
         if (updateTodo.isPresent()) {
             updateTodo.get().setTitle(title);
             onDataChanged();
-            return updateTodo.get();
+            return updateTodo;
         }
-        return null;
+        return Optional.empty();
     }
 
     @Override
@@ -63,20 +65,19 @@ public abstract class AbstractTodoService implements TodoService {
     }
 
     @Override
-    public Todo toggleComplete(Long id) {
+    public Optional<Todo> toggleComplete(Long id) {
         validateId(id);
-        Optional<Todo> toggleTodoOptional = findById(id);
-        if (toggleTodoOptional.isPresent()) {
-            Todo toggleTodo = toggleTodoOptional.get();
-            toggleTodo.setComplete(!toggleTodo.isComplete());
+        Optional<Todo> toggleTodo = findById(id);
+        if (toggleTodo.isPresent()) {
+            toggleTodo.get().setComplete(!toggleTodo.get().isComplete());
             onDataChanged();
             return toggleTodo;
         }
-        return null;
+        return Optional.empty();
     }
 
     @Override
-    public int totalTodo() {
+    public int getTotalCount() {
         return todos.size();
     }
 
@@ -94,10 +95,10 @@ public abstract class AbstractTodoService implements TodoService {
     @Override
     public void clear() {
         if (todos.isEmpty()) {
-            System.out.println("Todo list is already empty");
             return;
         }
         todos.clear();
+        idCounter.set(1L);
         onDataChanged();
     }
 
@@ -113,37 +114,36 @@ public abstract class AbstractTodoService implements TodoService {
     }
 
     @Override
-    public void getStatistics() {
+    public TodoStatistics getStatistics() {
         if (todos.isEmpty()) {
-            System.out.println("No todos available - Add some todos first");
-            return;
+            return new TodoStatistics(0, 0, 0, 0, 0, 0);
         }
+        var completionStats = todos.values().stream().collect(
+                (Collectors.groupingBy(todo -> todo.isComplete() ? "completed" : "pending", Collectors.counting())));
 
-        int totalTodo = todos.size();
-        int pendingTodo = (int) todos.values().stream().filter(t -> !t.isComplete()).count();
-        int completedTodo = totalTodo - pendingTodo;
+        var priorityStats = todos.values().stream().collect(Collectors.groupingBy(Todo::getPriority, Collectors.counting()));
 
-        System.out.println(" ===== TODO STATISTICS =====");
-        System.out.println("Total todos : " + totalTodo);
-        System.out.println("Pending todos : " + pendingTodo);
-        System.out.println("Completed todos : " + completedTodo);
-        System.out.println("Completion rate : " + Math.round((completedTodo / (double) totalTodo) * 100) + "%");
-        System.out.println("High priority : " + findByPriority(Priority.HIGH).size());
-        System.out.println("Medium priority : " + findByPriority(Priority.MEDIUM).size());
-        System.out.println("Low priority : " + findByPriority(Priority.LOW).size());
+        TodoStatistics todoStatistics = new TodoStatistics(todos.size(),
+                completionStats.getOrDefault("completed", 0L).intValue(),
+                completionStats.getOrDefault("pending", 0L).intValue(),
+                priorityStats.getOrDefault(Priority.LOW, 0L).intValue(),
+                priorityStats.getOrDefault(Priority.MEDIUM, 0L).intValue(),
+                priorityStats.getOrDefault(Priority.HIGH, 0L).intValue());
+
+        return todoStatistics;
     }
 
     @Override
-    public Todo setPriority(Long id, Priority priority) {
+    public Optional<Todo> setPriority(Long id, Priority priority) {
         validateId(id);
         validatePriority(priority);
         Optional<Todo> priorityTodo = findById(id);
         if (priorityTodo.isPresent()) {
             priorityTodo.get().setPriority(priority);
             onDataChanged();
-            return priorityTodo.get();
+            return priorityTodo;
         }
-        return null;
+        return Optional.empty();
     }
 
     @Override
@@ -162,19 +162,29 @@ public abstract class AbstractTodoService implements TodoService {
         if (id == null) {
             throw new IllegalArgumentException("ID cannot be null");
         }
-    }
 
-    private void validatePriority(Priority priority) {
-        if(priority == null) {
-            throw new IllegalArgumentException("Priority cannot be null");
-        } else if(priority != Priority.HIGH && priority != Priority.MEDIUM && priority != Priority.LOW) {
-            throw new IllegalArgumentException("Priority must be (HIGH/MEDIUM/LOW)");
+        if(id <= 0) {
+            throw new IllegalArgumentException("ID must be positive");
         }
     }
 
-    protected void setInitialData(Map<Long, Todo> initialTodos, long startingId) {
+    private void validatePriority(Priority priority) {
+        if (priority == null) {
+            throw new IllegalArgumentException("Priority cannot be null");
+        } 
+    }
+
+    protected void setInitialData(Map<Long, Todo> initialTodos) {
         this.todos.clear();
         this.todos.putAll(initialTodos);
-        this.idCounter.set(startingId);
     }
+
+    @Override
+    public void refresh() {
+        loadTodos();
+    }
+
+    public abstract void onDataChanged();
+
+    public abstract Map<Long, Todo> loadTodos();
 }

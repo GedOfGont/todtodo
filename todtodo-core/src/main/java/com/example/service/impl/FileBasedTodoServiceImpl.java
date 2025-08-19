@@ -17,13 +17,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Profile(value = "file")
 public class FileBasedTodoServiceImpl extends AbstractTodoService {
 
-    Logger logger = LoggerFactory.getLogger(FileBasedTodoServiceImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(FileBasedTodoServiceImpl.class);
     private final ObjectMapper objectMapper;
-    private File dataFile = new File("todos.json");
+    private final File dataFile = new File(System.getProperty("todos.file.path", "todos.json"));
 
     public FileBasedTodoServiceImpl() {
         super();
         this.objectMapper = new ObjectMapper();
+        setInitialData(loadTodos());
     }
 
     @Override
@@ -34,7 +35,7 @@ public class FileBasedTodoServiceImpl extends AbstractTodoService {
     private void saveToFile() {
         try {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(dataFile, todos);
-            System.out.println("[Todo] Saved to: " + dataFile.getAbsolutePath());
+            logger.info("Todos saved to file successfully");
         } catch (Exception e) {
             logger.error("Failed to save todos: ", e);
         }
@@ -44,10 +45,10 @@ public class FileBasedTodoServiceImpl extends AbstractTodoService {
     public Map<Long, Todo> loadTodos() {
         try {
             if (dataFile.exists() && dataFile.length() > 0) {
-                todos = objectMapper.readValue(dataFile, new TypeReference<Map<Long, Todo>>() {
+                Map<Long, Todo> loadedTodos = objectMapper.readValue(dataFile, new TypeReference<Map<Long, Todo>>() {
                 });
-                idCounter.set(todos.keySet().stream().max(Long::compareTo).orElse(0L) + 1);
-                return todos;
+                idCounter.set(loadedTodos.keySet().stream().max(Long::compareTo).orElse(0L) + 1);
+                return new ConcurrentHashMap<>(loadedTodos);
             }
         } catch (Exception e) {
             logger.error("Failed to load todos: ", e);

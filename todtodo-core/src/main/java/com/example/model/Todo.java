@@ -2,14 +2,30 @@ package com.example.model;
 
 import java.util.Objects;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 public class Todo {
 
     private Long id;
+
+    @NotBlank(message = "Title cannot be blank")
+    @Size(max = 200, message = "Title too long (max 200 characters)")
     private String title;
     private boolean complete;
+
+    @NotNull(message = "Priority cannot be null")
     private Priority priority;
 
     public Todo() {
+        this.priority = Priority.LOW;
+    }
+
+    public Todo(Long id, String title) {
+        this.id = id;
+        this.title = title;
+        this.complete = false;
         this.priority = Priority.LOW;
     }
 

@@ -12,7 +12,7 @@ import com.example.service.impl.InMemoryTodoServiceImpl;
 public class AppConfig {
     
     @Bean
-    @Profile(value = "file")
+    @Profile(value = {"file", "default"})
     public TodoService fileBasedTodoService() {
         return new FileBasedTodoServiceImpl();
     }
